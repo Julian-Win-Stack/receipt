@@ -18,15 +18,18 @@ test("package metadata: publish-safe cli configuration", async () => {
     readonly bugs?: { readonly url?: string };
     readonly homepage?: string;
   };
-  const expectedRepoUrl = "https://github.com/Julian-Win-Stack/ki-s-startup.git";
-  const expectedHomepage = "https://github.com/Julian-Win-Stack/ki-s-startup";
-  const expectedBugsUrl = "https://github.com/Julian-Win-Stack/ki-s-startup/issues";
+  const expectedRepoUrl = "https://github.com/skishore23/receipt.git";
+  const expectedHomepage = "https://github.com/skishore23/receipt";
+  const expectedBugsUrl = "https://github.com/skishore23/receipt/issues";
 
   expect(pkg.name).toBe("receipt-agent-cli");
   expect(pkg.private).toBe(false);
   expect(pkg.bin?.receipt).toBe("dist/cli.js");
   expect(pkg.engines?.node).toBe(">=20");
   expect(pkg.files?.includes("dist")).toBe(true);
+  expect(pkg.files?.includes("src")).toBe(true);
+  expect(pkg.files?.includes("skills")).toBe(true);
+  expect(pkg.files?.includes("profiles")).toBe(true);
   expect(pkg.scripts?.["pack:smoke"]).toBe("node scripts/smoke-pack-install.mjs");
   expect(pkg.repository?.url).toBe(expectedRepoUrl);
   expect(pkg.homepage).toBe(expectedHomepage);

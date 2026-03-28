@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -120,6 +121,14 @@ const resolveRepoRoot = (repoRoot?: string): string =>
   || process.env.RECEIPT_REPO_ROOT?.trim()
   || process.env.HUB_REPO_ROOT?.trim()
   || process.cwd();
+const hasFactoryProfileAssets = (root: string): boolean =>
+  existsSync(path.join(root, "profiles"))
+  || existsSync(path.join(root, "skills", "factory-receipt-worker"));
+const resolveFactoryProfileRoot = (preferredRoot: string): string => {
+  const resolved = path.resolve(preferredRoot);
+  if (hasFactoryProfileAssets(resolved)) return resolved;
+  return DEFAULT_FACTORY_PROFILE_ROOT;
+};
 const FACTORY_TASK_CODEX_MODEL =
   process.env.RECEIPT_FACTORY_TASK_MODEL?.trim()
   || process.env.HUB_FACTORY_TASK_MODEL?.trim()
@@ -669,7 +678,7 @@ export class FactoryService {
       dataDir: opts.dataDir,
       repoRoot: resolveRepoRoot(opts.repoRoot),
     });
-    this.profileRoot = path.resolve(opts.profileRoot ?? DEFAULT_FACTORY_PROFILE_ROOT);
+    this.profileRoot = resolveFactoryProfileRoot(opts.profileRoot ?? DEFAULT_FACTORY_PROFILE_ROOT);
     this.runtime = createRuntime<FactoryCmd, FactoryEvent, FactoryState>(
       jsonlStore<FactoryEvent>(opts.dataDir),
       jsonBranchStore(opts.dataDir),

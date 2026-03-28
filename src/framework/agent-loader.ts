@@ -15,11 +15,15 @@ const exists = async (target: string): Promise<boolean> => {
 };
 
 const inferAgentsDir = async (): Promise<{ readonly dir: string; readonly suffix: string }> => {
+  const distDir = packagePath(import.meta.url, "dist", "agent-routes");
+  if (await exists(distDir)) {
+    return { dir: distDir, suffix: ".agent.js" };
+  }
   const srcDir = packagePath(import.meta.url, "src", "agents");
   if (await exists(srcDir)) {
     return { dir: srcDir, suffix: ".agent.ts" };
   }
-  throw new Error(`Unable to locate agent source directory at ${srcDir}`);
+  throw new Error(`Unable to locate agent route directory at ${distDir} or ${srcDir}`);
 };
 
 const asRouteModule = (value: unknown): AgentRouteModule | undefined => {

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { packageRoot } from "../lib/runtime-paths";
 
 const PROFILE_DIR = "profiles";
 
@@ -280,10 +281,20 @@ export const resolveFactoryChatProfile = async (input: {
   readonly allowDefaultOverride?: boolean;
 }): Promise<FactoryChatResolvedProfile> => {
   const repoRoot = path.resolve(input.repoRoot);
-  const profileRoot = path.resolve(input.profileRoot ?? repoRoot);
-  const profiles = await discoverFactoryChatProfiles(profileRoot);
+  const preferredProfileRoot = path.resolve(input.profileRoot ?? repoRoot);
+  const profileRootCandidates = [...new Set([preferredProfileRoot, packageRoot(import.meta.url)])];
+  let profileRoot = preferredProfileRoot;
+  let profiles: ReadonlyArray<FactoryChatProfile> = [];
+  for (const candidateRoot of profileRootCandidates) {
+    const discovered = await discoverFactoryChatProfiles(candidateRoot);
+    if (discovered.length > 0) {
+      profileRoot = candidateRoot;
+      profiles = discovered;
+      break;
+    }
+  }
   if (profiles.length === 0) {
-    throw new Error(`no factory profiles found under ${ensureProfileDir(profileRoot)}`);
+    throw new Error(`no factory profiles found under ${ensureProfileDir(preferredProfileRoot)}`);
   }
   const requested = input.requestedId?.trim();
   const root = requested

@@ -2,7 +2,7 @@
   "name": "receipt-agent-cli",
   "private": false,
   "type": "module",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Immutable, replayable chains for agent runs",
   "author": "Receipt contributors",
   "license": "MIT",
@@ -12,13 +12,13 @@
     "automation",
     "workflows"
   ],
-  "homepage": "https://github.com/Julian-Win-Stack/ki-s-startup",
+  "homepage": "https://github.com/skishore23/receipt",
   "bugs": {
-    "url": "https://github.com/Julian-Win-Stack/ki-s-startup/issues"
+    "url": "https://github.com/skishore23/receipt/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Julian-Win-Stack/ki-s-startup.git"
+    "url": "https://github.com/skishore23/receipt.git"
   },
   "publishConfig": {
     "access": "public"
@@ -34,6 +34,10 @@
   },
   "files": [
     "dist",
+    "src",
+    "skills",
+    "profiles",
+    "AGENTS.md",
     "prompts",
     "README.md",
     "LICENSE"
@@ -64,7 +68,7 @@
     "docker:down": "bash scripts/docker-dev.sh down",
     "clean": "bun -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "bun run clean && bun run build:cli && bun run assets:prepare && bun run css:build",
-    "prepack": "npm run build:cli",
+    "prepack": "npm run build",
     "pack:smoke": "node scripts/smoke-pack-install.mjs",
     "new:agent": "bun src/cli.ts new",
     "test:smoke": "bun test --timeout 30000 ./tests/smoke",

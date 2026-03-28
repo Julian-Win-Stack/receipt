@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 import type { FactoryCloudProvider } from "./factory-cloud-context";
+import { packageRoot } from "../lib/runtime-paths";
 
 const execFileAsync = promisify(execFile);
 
@@ -111,6 +112,27 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const pathExists = async (targetPath: string): Promise<boolean> =>
   fs.access(targetPath).then(() => true).catch(() => false);
 
+const helperRuntimeRoots = (profileRoot: string): ReadonlyArray<string> => {
+  const roots = [path.resolve(profileRoot), packageRoot(import.meta.url)];
+  return [...new Set(roots)];
+};
+
+const resolveHelperCatalogRoot = async (profileRoot: string): Promise<string | undefined> => {
+  for (const root of helperRuntimeRoots(profileRoot)) {
+    const candidate = path.join(root, FACTORY_HELPER_CATALOG_RELATIVE_ROOT);
+    if (await pathExists(candidate)) return candidate;
+  }
+  return undefined;
+};
+
+const resolveHelperRunnerPath = async (profileRoot: string): Promise<string | undefined> => {
+  for (const root of helperRuntimeRoots(profileRoot)) {
+    const candidate = path.join(root, FACTORY_HELPER_RUNNER_RELATIVE_PATH);
+    if (await pathExists(candidate)) return candidate;
+  }
+  return undefined;
+};
+
 const normalizeText = (value: string): string =>
   value
     .toLowerCase()
@@ -190,7 +212,8 @@ export const loadFactoryHelperCatalog = async (
   profileRoot: string,
   domain?: string,
 ): Promise<ReadonlyArray<FactoryHelperCatalogEntry>> => {
-  const catalogRoot = path.join(profileRoot, FACTORY_HELPER_CATALOG_RELATIVE_ROOT);
+  const catalogRoot = await resolveHelperCatalogRoot(profileRoot);
+  if (!catalogRoot) return [];
   const domains = domain
     ? [domain]
     : (await fs.readdir(catalogRoot, { withFileTypes: true }).catch(() => []))
@@ -239,6 +262,7 @@ export const loadFactoryHelperContext = async (input: {
   const queryText = helperCatalogQueryText(input);
   const tokens = keywordTokens(queryText);
   const catalog = await loadFactoryHelperCatalog(input.profileRoot, input.domain ?? "infrastructure");
+  const runnerPath = await resolveHelperRunnerPath(input.profileRoot);
   const selectedHelpers = catalog
     .map((entry) => ({
       entry,
@@ -267,7 +291,7 @@ export const loadFactoryHelperContext = async (input: {
       score,
     }));
   return {
-    runnerPath: path.join(input.profileRoot, FACTORY_HELPER_RUNNER_RELATIVE_PATH),
+    runnerPath: runnerPath ?? path.join(input.profileRoot, FACTORY_HELPER_RUNNER_RELATIVE_PATH),
     guidance: [
       "Use checked-in helpers first for AWS investigations instead of generating a task-local script.",
       "If no helper matches the ask closely enough, author or extend a checked-in helper when the missing behavior is clear instead of stopping at a no-helper report.",
@@ -338,7 +362,10 @@ export const runFactoryHelper = async (input: {
   readonly domain?: string;
   readonly helperArgs?: ReadonlyArray<string>;
 }): Promise<FactoryHelperResult> => {
-  const runnerPath = path.join(input.profileRoot, FACTORY_HELPER_RUNNER_RELATIVE_PATH);
+  const runnerPath = await resolveHelperRunnerPath(input.profileRoot);
+  if (!runnerPath) {
+    throw new Error("helper runner not found in workspace or packaged runtime");
+  }
   const args = [
     runnerPath,
     "run",

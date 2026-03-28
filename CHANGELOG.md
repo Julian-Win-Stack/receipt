@@ -4,6 +4,17 @@ All notable changes to this project should be documented in this file.
 
 The format is based on Keep a Changelog and this project uses Semantic Versioning.
 
+## [0.1.2] - 2026-03-27
+
+### Added
+- Published package now includes bundled browser server runtime (`dist/server.js`) and bundled factory route modules (`dist/agent-routes`) so `receipt dev` works from npm installs.
+- Packed-install smoke now verifies browser runtime end-to-end by probing `/healthz` and `/factory`.
+
+### Changed
+- Interactive `receipt` now auto-runs onboarding when setup is missing, then opens the TUI by default and prints a browser UI URL as an alternative.
+- Published package contents now include `skills`, `profiles`, `AGENTS.md`, and source/runtime artifacts needed by TUI and browser flows.
+- Factory profile/helper resolution now falls back to packaged runtime assets when workspace-local copies are missing.
+
 ## [0.1.1] - 2026-03-28
 
 ### Fixed

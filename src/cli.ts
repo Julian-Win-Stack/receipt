@@ -18,7 +18,7 @@ import { runAgentLoop } from "./engine/runtime/agent-loop";
 import { createResonateAgentActionAdapter } from "./engine/runtime/resonate-agent-actions";
 import { handleFactoryCommand } from "./factory-cli/commands";
 import { resolveFactoryRuntimeConfig } from "./factory-cli/config";
-import { resolveBunRuntime } from "./lib/runtime-paths";
+import { packagePath, resolveBunRuntime } from "./lib/runtime-paths";
 import { resolveResonateGroups } from "./adapters/resonate-config";
 import { decide as decideJob, initial as initialJob, reduce as reduceJob, type JobCmd, type JobEvent, type JobState } from "./modules/job";
 import { hydrateEnvFromReceiptCliConfig, readReceiptCliConfigState } from "./receipt-cli/config";
@@ -36,6 +36,14 @@ const DATA_DIR = FACTORY_RUNTIME.dataDir;
 const JOB_BACKEND = process.env.JOB_BACKEND === "jsonl" ? "jsonl" : "resonate";
 const isInteractiveTerminal = (): boolean =>
   Boolean(process.stdin.isTTY && process.stdout.isTTY);
+const browserUiUrl = (): string => {
+  const rawPort = Number(process.env.PORT ?? 8787);
+  const port = Number.isFinite(rawPort) && rawPort > 0 ? Math.floor(rawPort) : 8787;
+  return `http://localhost:${String(port)}/factory`;
+};
+const printBrowserUiHint = (): void => {
+  console.log(`Browser UI (alternative): ${browserUiUrl()}`);
+};
 
 const printUsage = (): void => {
   console.log(`receipt <command> [args]
@@ -200,10 +208,14 @@ const looksLikeDefineAgentSpec = (value: unknown): value is {
 };
 
 const loadAgentDefault = async (agentId: string): Promise<unknown | undefined> => {
-  const srcFile = path.join(ROOT, "src", "agents", `${agentId}.agent.ts`);
-  if (fs.existsSync(srcFile)) {
+  const sourceCandidates = [
+    path.join(ROOT, "src", "agents", `${agentId}.agent.ts`),
+    packagePath(import.meta.url, "dist", "agent-routes", `${agentId}.agent.js`),
+  ];
+  const sourceFile = sourceCandidates.find((candidate) => fs.existsSync(candidate));
+  if (sourceFile) {
     try {
-      const mod = await import(pathToFileURL(srcFile).href);
+      const mod = await import(pathToFileURL(sourceFile).href);
       return mod.default;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
@@ -312,7 +324,10 @@ export default {
 };
 
 const commandDev = async (): Promise<void> => {
-  const child = spawn(resolveBunRuntime(), ["--watch", "src/server.ts"], {
+  const bundledServerEntry = packagePath(import.meta.url, "dist", "server.js");
+  const sourceServerEntry = packagePath(import.meta.url, "src", "server.ts");
+  const serverEntry = fs.existsSync(bundledServerEntry) ? bundledServerEntry : sourceServerEntry;
+  const child = spawn(resolveBunRuntime(), ["--watch", serverEntry], {
     cwd: ROOT,
     env: process.env,
     stdio: "inherit",
@@ -689,20 +704,36 @@ const commandMemory = async (args: ReadonlyArray<string>, flags: Flags): Promise
 const main = async (): Promise<void> => {
   const parsed = parseArgs(process.argv.slice(2));
   const command = parsed.command;
-  const configState = await readReceiptCliConfigState();
+  let configState = await readReceiptCliConfigState();
   const isStartReset = command === "start" && asBoolean(parsed.flags, "reset");
-  if (configState.status === "invalid") {
-    if (!isStartReset) {
+  const shouldAutoLaunchFactory = !command && isInteractiveTerminal();
+  if (configState.status === "invalid" && shouldAutoLaunchFactory) {
+    await runReceiptStart({ reset: true });
+    configState = await readReceiptCliConfigState();
+    if (configState.status !== "valid") {
       throw new Error(
         `Invalid receipt setup config at ${configState.configPath} (${configState.reason}). Run \`receipt start --reset\` to reconfigure.`,
       );
     }
-  } else if (configState.status === "valid" && !isStartReset) {
+  } else if (configState.status === "missing" && shouldAutoLaunchFactory) {
+    await runReceiptStart({});
+    configState = await readReceiptCliConfigState();
+    if (configState.status !== "valid") {
+      throw new Error(`Setup did not complete successfully. Run \`receipt start\` and try again.`);
+    }
+  } else if (configState.status === "invalid" && !isStartReset) {
+    throw new Error(
+      `Invalid receipt setup config at ${configState.configPath} (${configState.reason}). Run \`receipt start --reset\` to reconfigure.`,
+    );
+  }
+
+  if (configState.status === "valid" && !isStartReset) {
     hydrateEnvFromReceiptCliConfig(configState.config);
   }
 
   if (!command) {
     if (isInteractiveTerminal()) {
+      printBrowserUiHint();
       await handleFactoryCommand(ROOT, [], {});
       return;
     }

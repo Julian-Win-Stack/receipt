@@ -35,6 +35,12 @@ receipt start
 4. AWS account/profile selection
 5. Local config persistence
 
+Default interactive launch (`receipt` with no command):
+
+1. If setup is missing, the CLI runs onboarding first.
+2. After setup is valid, the CLI opens the existing Terminal UI (TUI) automatically.
+3. The CLI also prints a browser UI URL (`http://localhost:<PORT>/factory`) as an alternative option.
+
 Reconfigure behavior:
 
 - `receipt start`: reruns checks and reuses saved values as defaults
@@ -84,7 +90,7 @@ receipt new release-notes --template assistant-tool
 ```
 
 ### receipt dev
-- Purpose: run `bun --watch src/server.ts`.
+- Purpose: run browser UI server for `/factory` using bundled runtime (`dist/server.js` when present).
 - Flags: none.
 - Output: streams server logs to stdout/stderr.
 - Example:

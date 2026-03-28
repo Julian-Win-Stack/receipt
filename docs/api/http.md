@@ -2,6 +2,12 @@
 
 Base URL: `http://localhost:8787` (or `PORT`).
 
+Published CLI startup:
+
+```bash
+receipt dev
+```
+
 ## Conventions
 - JSON APIs use `Content-Type: application/json`.
 - Form routes use `Content-Type: application/x-www-form-urlencoded`.
