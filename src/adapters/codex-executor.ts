@@ -346,6 +346,39 @@ const isSandboxBootstrapFailure = (value: unknown): boolean => {
   return SANDBOX_BOOTSTRAP_FAILURE_PATTERNS.some((pattern) => pattern.test(message));
 };
 
+const ensureCodexLoginWithApiKey = async (
+  bin: string,
+  env: NodeJS.ProcessEnv,
+  openAiApiKey: string,
+): Promise<{ readonly ok: boolean; readonly code: number | null; readonly stderr: string }> =>
+  new Promise((resolve) => {
+    const child = spawn(bin, ["login", "--with-api-key"], {
+      env,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let stderr = "";
+    child.stderr.setEncoding("utf-8");
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+    child.on("error", (err) => {
+      resolve({
+        ok: false,
+        code: null,
+        stderr: err.message,
+      });
+    });
+    child.on("close", (code) => {
+      resolve({
+        ok: code === 0,
+        code,
+        stderr: stderr.trim(),
+      });
+    });
+    child.stdin.write(openAiApiKey);
+    child.stdin.end();
+  });
+
 export class LocalCodexExecutor implements CodexExecutor {
   private readonly bin: string;
   private readonly timeoutMs: number;
@@ -378,6 +411,13 @@ export class LocalCodexExecutor implements CodexExecutor {
     if (input.isolateCodexHome) {
       isolatedCodexHome = await prepareIsolatedCodexHome(childEnv);
       if (isolatedCodexHome) childEnv.CODEX_HOME = isolatedCodexHome;
+    }
+    const effectiveCodexHome = childEnv.CODEX_HOME?.trim()
+      || path.join(childEnv.HOME?.trim() || os.homedir(), ".codex");
+    const openAiApiKey = childEnv.OPENAI_API_KEY?.trim() ?? "";
+    const codexAuthPath = path.join(effectiveCodexHome, "auth.json");
+    if (!fs.existsSync(codexAuthPath) && openAiApiKey) {
+      await ensureCodexLoginWithApiKey(this.bin, childEnv, openAiApiKey);
     }
 
     try {

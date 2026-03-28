@@ -956,16 +956,18 @@ app.post("/agents/:id/jobs", async (c) => {
   return jsonResponse(202, { ok: true, job });
 });
 
-app.get("/healthz", async () => jsonResponse(200, {
-  ok: true,
-  uptimeSec: Math.floor(process.uptime()),
-  dataDir: DATA_DIR,
-  jobBackend: JOB_BACKEND,
-  processRole: PROCESS_ROLE,
-  queue: queue.snapshot(),
-  codexBin: process.env.RECEIPT_CODEX_BIN ?? process.env.HUB_CODEX_BIN ?? "codex",
-  resonateUrl: process.env.RESONATE_URL ?? "http://127.0.0.1:8001",
-}));
+app.get("/healthz", async () => {
+  return jsonResponse(200, {
+    ok: true,
+    uptimeSec: Math.floor(process.uptime()),
+    dataDir: DATA_DIR,
+    jobBackend: JOB_BACKEND,
+    processRole: PROCESS_ROLE,
+    queue: queue.snapshot(),
+    codexBin: process.env.RECEIPT_CODEX_BIN ?? process.env.HUB_CODEX_BIN ?? "codex",
+    resonateUrl: process.env.RESONATE_URL ?? "http://127.0.0.1:8001",
+  });
+});
 
 app.post("/jobs/:id/steer", async (c) => {
   const jobId = c.req.param("id");

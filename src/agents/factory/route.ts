@@ -1914,17 +1914,19 @@ const createFactoryRoute = (ctx: AgentLoaderContext): AgentRouteModule => {
       });
 
       app.get("/factory", async (c) => wrap(
-        async () => buildChatShellModelCached({
-          profileId: requestedProfileId(c.req.raw),
-          chatId: requestedChatId(c.req.raw),
-          objectiveId: requestedObjectiveId(c.req.raw),
-          runId: requestedRunId(c.req.raw),
-          jobId: requestedJobId(c.req.raw),
-          panel: requestedPanel(c.req.raw),
-          focusKind: normalizeFocusKind(requestedFocusKind(c.req.raw)),
-          focusId: requestedFocusId(c.req.raw),
-          showAll: requestedShowAll(c.req.raw),
-        }),
+        async () => {
+          return buildChatShellModelCached({
+            profileId: requestedProfileId(c.req.raw),
+            chatId: requestedChatId(c.req.raw),
+            objectiveId: requestedObjectiveId(c.req.raw),
+            runId: requestedRunId(c.req.raw),
+            jobId: requestedJobId(c.req.raw),
+            panel: requestedPanel(c.req.raw),
+            focusKind: normalizeFocusKind(requestedFocusKind(c.req.raw)),
+            focusId: requestedFocusId(c.req.raw),
+            showAll: requestedShowAll(c.req.raw),
+          });
+        },
         (model) => html(factoryChatShell(model))
       ));
 
