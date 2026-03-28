@@ -111,6 +111,7 @@ const execFileAsync = promisify(execFile);
 
 const FACTORY_STREAM_PREFIX = "factory/objectives";
 const DEFAULT_CHECKS = ["bun run build"] as const;
+const DEFAULT_CHECK_SET = new Set<string>(DEFAULT_CHECKS);
 const FACTORY_DATA_DIR = ".receipt/factory";
 const DEFAULT_FACTORY_PROFILE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const FACTORY_CONTROL_AGENT_ID = "factory-control";
@@ -185,6 +186,34 @@ const uniqueChecks = (checks?: ReadonlyArray<string>): ReadonlyArray<string> => 
     .map((item) => item.trim())
     .filter(Boolean);
   return [...new Set(source)];
+};
+const readPackageScripts = async (workspacePath: string): Promise<Readonly<Record<string, string>> | undefined> => {
+  const packageJsonPath = path.join(workspacePath, "package.json");
+  try {
+    const raw = await fs.readFile(packageJsonPath, "utf-8");
+    const parsed = JSON.parse(raw) as { readonly scripts?: unknown };
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+    const scripts = parsed.scripts;
+    if (!scripts || typeof scripts !== "object" || Array.isArray(scripts)) return undefined;
+    const entries = Object.entries(scripts)
+      .filter((entry): entry is [string, string] => typeof entry[0] === "string" && typeof entry[1] === "string")
+      .map(([name, command]) => [name.trim(), command.trim()] as const)
+      .filter(([name, command]) => Boolean(name) && Boolean(command));
+    return Object.fromEntries(entries);
+  } catch {
+    return undefined;
+  }
+};
+const inferDefaultValidationCommands = async (workspacePath: string): Promise<ReadonlyArray<string>> => {
+  const scripts = await readPackageScripts(workspacePath);
+  if (!scripts?.build) return [];
+  return [...DEFAULT_CHECKS];
+};
+const missingRunScriptName = (command: string): string | undefined => {
+  const trimmed = command.trim();
+  const match = trimmed.match(/^(?:bun|npm|pnpm|yarn)\s+run\s+([a-zA-Z0-9:_-]+)\b/);
+  if (!match?.[1]) return undefined;
+  return match[1];
 };
 const stateRef = (ref: string, label?: string): GraphRef => ({ kind: "state", ref, label });
 const fileRef = (ref: string, label?: string): GraphRef => ({ kind: "file", ref, label });
@@ -1344,12 +1373,12 @@ export class FactoryService {
         `profile '${profile.rootProfileId}' is not allowed to create Factory objectives`,
       );
     }
-    const checks = input.checks?.length
+    const checks = input.checks
       ? uniqueChecks(input.checks)
       : profile.objectivePolicy.defaultValidationMode === "none"
         ? []
         : uniqueChecks(undefined);
-    const checksSource = input.checks?.length
+    const checksSource = input.checks
       ? "explicit"
       : profile.objectivePolicy.defaultValidationMode === "none"
         ? "profile"
@@ -1546,10 +1575,11 @@ export class FactoryService {
   }
 
   async buildComposeModel(): Promise<FactoryComposeModel> {
-    const [sourceStatus, defaultBranch, objectives] = await Promise.all([
+    const [sourceStatus, defaultBranch, objectives, defaultValidationCommands] = await Promise.all([
       this.git.sourceStatus(),
       this.git.defaultBranch(),
       this.listObjectives(),
+      inferDefaultValidationCommands(this.git.repoRoot),
     ]);
     return {
       defaultBranch,
@@ -1558,7 +1588,7 @@ export class FactoryService {
       objectiveCount: objectives.filter((objective) => !objective.archivedAt).length,
       defaultPolicy: DEFAULT_FACTORY_OBJECTIVE_POLICY,
       profileSummary: FACTORY_PROFILE_SUMMARY,
-      defaultValidationCommands: [...DEFAULT_CHECKS],
+      defaultValidationCommands,
     };
   }
 
@@ -6066,9 +6096,26 @@ export class FactoryService {
 
   private async runChecks(commands: ReadonlyArray<string>, workspacePath: string): Promise<ReadonlyArray<FactoryCheckResult>> {
     const workspaceCommandEnv = await this.ensureWorkspaceCommandEnv(workspacePath);
+    const scripts = await readPackageScripts(workspacePath);
     const results: FactoryCheckResult[] = [];
     for (const command of commands) {
       const startedAt = Date.now();
+      const scriptName = missingRunScriptName(command);
+      if (scriptName && !scripts?.[scriptName]) {
+        const reason = `validation command requires missing package.json script '${scriptName}'`;
+        const isDefaultCheck = DEFAULT_CHECK_SET.has(command.trim());
+        results.push({
+          command,
+          ok: isDefaultCheck,
+          exitCode: isDefaultCheck ? 0 : 1,
+          stdout: isDefaultCheck ? `Skipped default check '${command}': ${reason}.` : "",
+          stderr: isDefaultCheck ? "" : reason,
+          startedAt,
+          finishedAt: Date.now(),
+        });
+        if (!isDefaultCheck) break;
+        continue;
+      }
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(new Error("check command timed out after 60 minutes")), 60 * 60 * 1000);
       try {

@@ -24,8 +24,8 @@ test("package metadata: publish-safe cli configuration", async () => {
 
   expect(pkg.name).toBe("receipt-agent-cli");
   expect(pkg.private).toBe(false);
-  expect(pkg.bin?.receipt).toBe("dist/cli.js");
-  expect(pkg.engines?.node).toBe(">=20");
+  expect(pkg.bin?.receipt).toBe("dist/receipt");
+  expect(pkg.engines?.bun).toBe(">=1.2.0");
   expect(pkg.files?.includes("dist")).toBe(true);
   expect(pkg.files?.includes("src")).toBe(true);
   expect(pkg.files?.includes("skills")).toBe(true);

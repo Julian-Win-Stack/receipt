@@ -12,6 +12,7 @@ Before publishing:
    - CLI build
    - smoke tests
    - packed artifact install smoke test
+4. Bun runtime requirement for published CLI is documented and tested (`engines.bun`, launcher, pack smoke).
 
 Use:
 

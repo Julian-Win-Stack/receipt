@@ -5,6 +5,7 @@ Binary entrypoint: `receipt`.
 Install published CLI:
 
 ```bash
+# Install Bun first: https://bun.sh/docs/installation
 npm install -g receipt-agent-cli
 ```
 
@@ -17,7 +18,7 @@ bun src/cli.ts <command> [args]
 
 Minimum versions:
 
-- Node.js `>=20.0.0`
+- Bun `>=1.2.0`
 - GitHub CLI (`gh`) `>=2.81.0`
 - AWS CLI v2 `>=2.0.0`
 

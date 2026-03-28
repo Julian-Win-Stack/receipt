@@ -49,6 +49,7 @@ const git = async (cwd: string, args: ReadonlyArray<string>): Promise<string> =>
 const createRepo = async (opts: {
   readonly packageManager?: string;
   readonly withBunLock?: boolean;
+  readonly withBuildScript?: boolean;
 } = {}): Promise<string> => {
   const repoDir = await createTempDir("receipt-factory-cli-repo");
   await git(repoDir, ["init"]);
@@ -58,9 +59,13 @@ const createRepo = async (opts: {
     name: "factory-cli-test",
     ...(opts.packageManager ? { packageManager: opts.packageManager } : {}),
     private: true,
-    scripts: {
-      build: "bun -e \"process.exit(0)\"",
-    },
+    ...(opts.withBuildScript === false
+      ? {}
+      : {
+          scripts: {
+            build: "bun -e \"process.exit(0)\"",
+          },
+        }),
   }, null, 2), "utf-8");
   if (opts.withBunLock) {
     await fs.writeFile(path.join(repoDir, "bun.lock"), "{}", "utf-8");
@@ -608,6 +613,52 @@ test("factory cli: bun repos infer bun validation commands", async () => {
   };
   expect(initPayload.config.defaultChecks).toContain("bun run build");
   expect(initPayload.environment.sourceDirty).toBe(false);
+}, 120_000);
+
+test("factory cli: init omits build validation when script is missing", async () => {
+  const repoDir = await createRepo({ withBuildScript: false });
+  const init = await runCli(["factory", "init", "--yes", "--force", "--json", "--repo-root", repoDir]);
+  expect(init.code).toBe(0);
+  const initPayload = JSON.parse(init.stdout) as {
+    readonly config: { readonly defaultChecks: ReadonlyArray<string> };
+  };
+  expect(initPayload.config.defaultChecks).toEqual([]);
+}, 120_000);
+
+test("factory cli: create keeps explicit empty checks from config", async () => {
+  const repoDir = await createRepo({ withBuildScript: false });
+  const init = await runCli(["factory", "init", "--yes", "--force", "--json", "--repo-root", repoDir]);
+  expect(init.code).toBe(0);
+
+  const created = await runCli([
+    "factory",
+    "create",
+    "--json",
+    "--repo-root",
+    repoDir,
+    "--title",
+    "No build script objective",
+    "--prompt",
+    "Create hello-retest.txt with one line: retest ok",
+  ]);
+  expect(created.code).toBe(0);
+  const createdPayload = JSON.parse(created.stdout) as { readonly objectiveId: string };
+
+  const inspected = await runCli([
+    "factory",
+    "inspect",
+    createdPayload.objectiveId,
+    "--json",
+    "--repo-root",
+    repoDir,
+  ]);
+  expect(inspected.code).toBe(0);
+  const inspectedPayload = JSON.parse(inspected.stdout) as {
+    readonly panel: string;
+    readonly data: { readonly checks: ReadonlyArray<string> };
+  };
+  expect(inspectedPayload.panel).toBe("overview");
+  expect(inspectedPayload.data.checks).toEqual([]);
 }, 120_000);
 
 test("factory cli: replay folds a historical infrastructure objective into the current workflow projection", async () => {

@@ -4,6 +4,16 @@ All notable changes to this project should be documented in this file.
 
 The format is based on Keep a Changelog and this project uses Semantic Versioning.
 
+## [0.2.0] - 2026-03-28
+
+### Changed
+- Published `receipt` CLI runtime is now Bun-first: package `bin` points to a Bun launcher and requires Bun `>=1.2.0` at runtime.
+- `factory init` now preserves explicit empty checks from config/objective inputs instead of silently reapplying default checks.
+
+### Added
+- Published launcher now prints a clear runtime error with Bun install guidance when Bun is missing.
+- Smoke regression test coverage for objectives created from configs with `defaultChecks: []`.
+
 ## [0.1.2] - 2026-03-27
 
 ### Added
